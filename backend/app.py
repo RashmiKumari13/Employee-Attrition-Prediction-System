@@ -13,6 +13,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 model_service = AttritionModelService()
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+FRONTEND_BASE_PREFIX = "Employee-Attrition-Prediction-System"
 
 
 @app.get("/")
@@ -34,6 +35,36 @@ def root():
             ],
         }
     )
+
+
+@app.get(f"/{FRONTEND_BASE_PREFIX}/")
+def root_with_base_prefix():
+    if (FRONTEND_DIST / "index.html").exists():
+        return send_from_directory(FRONTEND_DIST, "index.html")
+
+    return jsonify(
+        {
+            "message": "Employee Attrition Prediction API is running.",
+            "tip": "Build frontend (`npm run build`) to serve dashboard from :5000 root.",
+            "api_endpoints": [
+                "/api/health",
+                "/api/model-info",
+                "/api/features",
+                "/api/predict",
+                "/api/report",
+                "/api/reload-model",
+            ],
+        }
+    )
+
+
+@app.get(f"/{FRONTEND_BASE_PREFIX}/<path:path>")
+def serve_prefixed_frontend_asset(path: str):
+    candidate = FRONTEND_DIST / path
+    if candidate.exists() and candidate.is_file():
+        return send_from_directory(FRONTEND_DIST, path)
+
+    return jsonify({"error": "Asset not found."}), 404
 
 
 @app.get("/api/health")

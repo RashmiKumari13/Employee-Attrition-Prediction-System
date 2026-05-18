@@ -92,6 +92,12 @@ npm run dev
 
 Default frontend URL: `http://127.0.0.1:5173`
 
+> For local development, frontend now loads `VITE_API_BASE_URL` from `frontend/.env.development` and will fall back to the relative `/api` path when the backend is served from the same host.
+> 
+> In production, you can also leave `frontend/.env.production` blank if the frontend and backend are deployed together behind the same origin. If the backend is deployed separately, set `VITE_API_BASE_URL` to that backend URL.
+> 
+> The backend now also supports serving the GitHub Pages production build asset path `/Employee-Attrition-Prediction-System/` when the frontend is built with that base path.
+
 ## API Endpoints
 
 - `GET /api/health` -> service health + model readiness
@@ -182,3 +188,97 @@ Default frontend URL: `http://127.0.0.1:5173`
 - Unknown categorical values are accepted and flagged in response warnings.
 - SHAP values are generated from the trained tree model for per-user explainability.
 - Frontend provides two export options: browser-side PDF (`jsPDF`) and server-side PDF (`ReportLab`).
+
+## Deployment Guide
+
+### **Option 1: Deploy Frontend to GitHub Pages (Frontend Only)**
+
+If you just want to deploy the frontend to GitHub Pages:
+
+```bash
+# From the repository root
+cd frontend
+npm install
+npm run build
+npm run deploy
+```
+
+This deploys only the frontend. **However, the app requires a backend API to function.**
+
+### **Option 2: Full-Stack Deployment (Frontend + Backend)**
+
+#### Step 1: Deploy Backend to Render.com (Recommended - Free)
+
+1. Go to https://render.com/ and sign up
+2. Create a new **Web Service**
+3. Connect your GitHub repository
+4. Configure the service:
+   - **Name**: `employee-attrition-api`
+   - **Root Directory**: `backend`
+   - **Runtime**: Python
+   - **Build Command**: `pip install -r requirements.txt && python train_model.py`
+   - **Start Command**: `gunicorn app:app`
+5. Set **Environment Variable**:
+   - `PYTHON_VERSION` = `3.9`
+6. Deploy
+
+Wait for deployment to complete. Your backend URL will be something like: `https://employee-attrition-api.onrender.com`
+
+#### Step 2: Update Frontend with Backend URL
+
+1. Edit `frontend/.env.production`:
+   ```
+   VITE_API_BASE_URL=https://your-render-app.onrender.com
+   ```
+
+2. Commit and push:
+   ```bash
+   git add frontend/.env.production
+   git commit -m "Update API endpoint for Render deployment"
+   git push origin main
+   ```
+
+3. Deploy frontend to GitHub Pages:
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   npm run deploy
+   ```
+
+#### Step 3: Verify Deployment
+
+- Frontend: https://rashmikumari13.github.io/Employee-Attrition-Prediction-System/
+- Backend: https://your-render-app.onrender.com/api/health
+
+### **Option 3: Deploy Everything to Vercel (Experimental)**
+
+1. Install Vercel CLI:
+   ```bash
+   npm install -g vercel
+   ```
+
+2. Deploy to Vercel:
+   ```bash
+   vercel
+   ```
+
+3. Follow the prompts to connect your GitHub repository
+
+**Note**: Vercel's Python support for serverless functions is limited. Render.com is recommended for this Flask API.
+
+### Troubleshooting
+
+**"Backend is up but model artifacts are missing"**
+- Ensure `train_model.py` runs successfully during deployment
+- Check that `backend/models/attrition_pipeline.joblib` is created
+- Check that `backend/artifacts/model_metadata.json` is created
+
+**"Cannot connect to API"**
+- Verify backend service is running and healthy
+- Check CORS is enabled on the backend (it is in `backend/app.py`)
+- Verify `VITE_API_BASE_URL` in `frontend/.env.production` is correct
+
+**CORS errors**
+- Backend has `CORS` enabled for all origins - this is fine for demo purposes
+- For production, restrict CORS to your frontend domain

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim().replace(/\/+$/, "");
 
 function toLabel(value) {
   return value
@@ -10,7 +10,25 @@ function toLabel(value) {
 }
 
 function endpoint(path) {
-  return `${API_BASE}${path}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return API_BASE ? `${API_BASE}${normalizedPath}` : normalizedPath;
+}
+
+function getDeploymentErrorMessage(error) {
+  const isNetworkError =
+    error.message.includes("Failed to fetch") ||
+    error.message.includes("NetworkError");
+  const noApiUrl = API_BASE === "";
+
+  if (isNetworkError && noApiUrl) {
+    return `Cannot connect to backend API at /api. Start the Flask backend locally at http://127.0.0.1:5000, or set VITE_API_BASE_URL in frontend/.env.production for a separate deployed backend.`;
+  }
+
+  if (isNetworkError) {
+    return `Cannot connect to backend API at ${API_BASE}. Is the backend service running and accessible?`;
+  }
+
+  return error.message;
 }
 
 function fallbackSummary(prediction) {
@@ -118,7 +136,7 @@ export default function App() {
         setDefaults(loadedDefaults);
         setFormData(loadedDefaults);
       } catch (bootstrapError) {
-        setError(bootstrapError.message);
+        setError(getDeploymentErrorMessage(bootstrapError));
       } finally {
         setBootstrapLoading(false);
       }
